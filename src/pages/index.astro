@@ -54,8 +54,23 @@ const ERROR_TAGS = [
   "IMAGE_MISMATCH",
 ];
 
+const PREFIXES = [
+  "SGK_CanhDieu_DaoDuc_1",
+  "SGK_CanhDieu_DaoDuc_2",
+  "SGK_CanhDieu_DaoDuc_3",
+  "SGK_CanhDieu_TiengViet_2_Tap1",
+  "SGK_CanhDieu_TiengViet_2_Tap2",
+  "SGK_CanhDieu_Toan_1",
+  "SGK_CanhDieu_Toan_3_Tap1",
+  "SGK_CanhDieu_TuNhienVaXaHoi_1",
+  "SGK_CanhDieu_TuNhienVaXaHoi_2",
+  "SGK_CanhDieu_TuNhienVaXaHoi_3",
+];
+
 let message = "";
 let finished = false;
+let totalCount = 0;
+let checkedCount = 0;
 
 if (Astro.request.method === "POST") {
   try {
@@ -95,27 +110,100 @@ if (Astro.request.method === "POST") {
   }
 }
 
+// --- Filter Logic ---
+const cookieHeader = Astro.request.headers.get("cookie") || "";
+// Simple cookie parser
+const getCookie = (name: string) => {
+  const value = `; ${cookieHeader}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
+  return null;
+};
+
+const filterCookie = getCookie("dataset_filter");
+let activeFilters = PREFIXES; // Default to all
+if (filterCookie) {
+  try {
+    const parsed = JSON.parse(decodeURIComponent(filterCookie));
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      activeFilters = parsed;
+    }
+  } catch (e) {
+    console.error("Error parsing filter cookie", e);
+  }
+}
+
 let dataRow = null;
 if (!finished) {
   const priorities = ["high", "normal", "low"];
+
+  // Build the OR clause for filtering
+  // id.like.Prefix1%,id.like.Prefix2%
+  const filterQuery = activeFilters.map((p) => `id.like.${p}%`).join(",");
+
   for (const p of priorities) {
-    const { data } = await supabase
+    let query = supabase
       .from("dataset")
       .select("*")
       .eq("is_checked", false)
-      .eq("review_priority", p)
-      .limit(50);
+      .eq("review_priority", p);
+
+    // Apply Filter
+    if (filterQuery) {
+      query = query.or(filterQuery);
+    }
+
+    const { data } = await query.limit(50);
+
     if (data && data.length) {
       dataRow = data[Math.floor(Math.random() * data.length)];
       break;
     }
   }
+
+  // Calculate Progress (Requirement 2)
+  totalCount = 0;
+  checkedCount = 0;
+
+  let totalQuery = supabase
+    .from("dataset")
+    .select("*", { count: "exact", head: true });
+  let checkedQuery = supabase
+    .from("dataset")
+    .select("*", { count: "exact", head: true })
+    .eq("is_checked", true);
+
+  if (filterQuery) {
+    totalQuery = totalQuery.or(filterQuery);
+    checkedQuery = checkedQuery.or(filterQuery);
+  }
+
+  const [totalRes, checkedRes] = await Promise.all([totalQuery, checkedQuery]);
+  if (totalRes.count !== null) totalCount = totalRes.count;
+  if (checkedRes.count !== null) checkedCount = checkedRes.count;
+
   if (!dataRow) {
-    const { count } = await supabase
+    // ... existing finished check ...
+    let countQuery = supabase
       .from("dataset")
       .select("*", { count: "exact", head: true })
       .eq("is_checked", false);
-    if (count === 0) finished = true;
+
+    if (filterQuery) {
+      countQuery = countQuery.or(filterQuery);
+    }
+
+    const { count } = await countQuery;
+    if (count === 0) {
+      const { count: globalCount } = await supabase
+        .from("dataset")
+        .select("*", { count: "exact", head: true })
+        .eq("is_checked", false);
+
+      if (globalCount === 0) {
+        finished = true;
+      }
+    }
   }
 }
 ---
@@ -137,6 +225,13 @@ if (!finished) {
       ::selection {
         background-color: #cbd5e1;
         color: #0f172a;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
       }
     </style>
   </head>
@@ -163,10 +258,30 @@ if (!finished) {
         <div class="flex h-full">
           {/* Left: Image (5/12) */}
           <div class="w-5/12 bg-zinc-900 flex flex-col relative">
-            <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-zinc-900/90 backdrop-blur-sm z-10 border-b border-white/5">
-              <span class="font-mono text-xs text-zinc-500">
-                ID: {dataRow.id}
-              </span>
+            <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-start bg-zinc-900/90 backdrop-blur-sm z-10 border-b border-white/5">
+              <div class="flex flex-col space-y-2">
+                <span class="font-mono text-xs text-zinc-500">
+                  ID: {dataRow.id}
+                </span>
+                {/* Progress Indicator */}
+                <div class="flex flex-col space-y-1">
+                  <div class="flex items-center space-x-2">
+                    <span class="text-[10px] uppercase tracking-wider font-bold text-zinc-400">
+                      Progress
+                    </span>
+                    <span class="text-[10px] text-zinc-300 font-mono">
+                      {checkedCount} / {totalCount}
+                    </span>
+                  </div>
+                  <div class="w-32 h-1.5 bg-zinc-800 rounded-full overflow-hidden border border-white/5">
+                    <div
+                      class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                      style={`width: ${totalCount > 0 ? (checkedCount / totalCount) * 100 : 0}%`}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <span
                 class={`text-xs font-medium px-2 py-0.5 rounded ${
                   dataRow.review_priority === "high"
@@ -189,12 +304,109 @@ if (!finished) {
           </div>
 
           {/* Right: Form (7/12) */}
-          <div class="w-7/12 bg-white border-l border-slate-200 flex flex-col">
-            <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-baseline">
-              <h2 class="font-semibold text-slate-900 text-lg">Review Item</h2>
-              <span class="text-xs text-slate-400 uppercase tracking-widest font-medium">
-                Data Validation
-              </span>
+          <div class="w-7/12 bg-white border-l border-slate-200 flex flex-col relative">
+            <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-white z-20">
+              <div class="flex items-baseline space-x-3">
+                <h2 class="font-semibold text-slate-900 text-lg">
+                  Review Item
+                </h2>
+                <span class="text-xs text-slate-400 uppercase tracking-widest font-medium">
+                  Data Validation
+                </span>
+              </div>
+
+              {/* Filter Button */}
+              <button
+                id="filter-btn"
+                class="flex items-center space-x-2 text-sm font-medium text-slate-600 hover:text-indigo-600 transition-colors bg-slate-50 hover:bg-indigo-50 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-indigo-200"
+              >
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                  />
+                </svg>
+                <span>
+                  Filter Dataset (
+                  {activeFilters.length === PREFIXES.length
+                    ? "All"
+                    : activeFilters.length}
+                  )
+                </span>
+              </button>
+            </div>
+
+            {/* Filter Modal */}
+            <div
+              id="filter-modal"
+              class="hidden absolute top-16 right-8 w-80 bg-white shadow-2xl rounded-xl border border-slate-200 z-50 animate-fade-in flex flex-col max-h-[80vh]"
+            >
+              <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
+                <h3 class="font-bold text-slate-700 text-sm">Filter by Book</h3>
+                <button
+                  id="close-filter"
+                  class="text-slate-400 hover:text-rose-500"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="p-2 border-b border-slate-100 flex justify-between text-xs px-4">
+                <button
+                  id="select-all"
+                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Select All
+                </button>
+                <button
+                  id="clear-all"
+                  class="text-slate-500 hover:text-rose-500 font-medium"
+                >
+                  Clear All
+                </button>
+              </div>
+              <div class="overflow-y-auto p-4 space-y-2 flex-1 custom-scrollbar">
+                {PREFIXES.map((prefix) => (
+                  <label class="flex items-start space-x-3 cursor-pointer group p-1 hover:bg-slate-50 rounded text-sm">
+                    <input
+                      type="checkbox"
+                      name="prefix_filter"
+                      value={prefix}
+                      checked={activeFilters.includes(prefix)}
+                      class="mt-0.5 rounded border-slate-300 text-indigo-600 shadow-sm focus:ring-0"
+                    />
+                    <span class="text-slate-600 group-hover:text-slate-900 break-words leading-tight">
+                      {prefix}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div class="p-4 border-t border-slate-100 bg-slate-50 rounded-b-xl">
+                <button
+                  id="apply-filter"
+                  class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md transition-all text-sm"
+                >
+                  Apply & Reload
+                </button>
+              </div>
             </div>
 
             {message && (
@@ -394,7 +606,7 @@ if (!finished) {
                     class="hidden mt-4 pt-4 border-t border-slate-200"
                   >
                     <div class="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                      {OBJECTS_PRESENT_ENUM.map((obj) => (
+                      {OBJECTS_PRESENT_ENUM.map((obj: string) => (
                         <label class="flex items-center space-x-2 cursor-pointer p-1 hover:bg-slate-100 rounded">
                           <input
                             type="checkbox"
@@ -562,7 +774,7 @@ if (!finished) {
                 </div>
               </div>
 
-              <div class="sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-100 -mx-8 px-8">
+              <div class="sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-100 -mx-8 px-8 z-30">
                 <button
                   type="submit"
                   class="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:-translate-y-0.5"
@@ -587,8 +799,14 @@ if (!finished) {
           </div>
         </div>
       ) : (
-        <div class="flex items-center justify-center h-full text-slate-400 text-sm">
-          Loading dataset...
+        <div class="flex items-center justify-center flex-col h-full text-slate-400 text-sm space-y-4">
+          <p>No more items found for these filters.</p>
+          <button
+            onclick="document.cookie='dataset_filter=; Max-Age=0; path=/'; window.location.reload()"
+            class="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
+          >
+            Clear Filters & Try Again
+          </button>
         </div>
       )
     }
@@ -597,7 +815,6 @@ if (!finished) {
         const el = document.getElementById(id);
         const cl = document.getElementById("changelog_container");
 
-        // Logic: Show edit field if "No" selected
         if (radio.value === "no") {
           el.classList.remove("hidden");
           cl.classList.remove("hidden");
@@ -605,7 +822,6 @@ if (!finished) {
           el.classList.add("hidden");
         }
 
-        // Logic: Only hide changelog if NO "no" radios are selected across the entire form
         const anyNo = document.querySelectorAll(
           'input[type="radio"][value="no"]:checked',
         );
@@ -614,6 +830,57 @@ if (!finished) {
         } else {
           cl.classList.remove("hidden");
         }
+      }
+
+      // Filter Logic
+      const filterBtn = document.getElementById("filter-btn");
+      const filterModal = document.getElementById("filter-modal");
+      const closeFilter = document.getElementById("close-filter");
+      const applyFilter = document.getElementById("apply-filter");
+      const selectAll = document.getElementById("select-all");
+      const clearAll = document.getElementById("clear-all");
+
+      if (filterBtn) {
+        filterBtn.addEventListener("click", () => {
+          filterModal.classList.remove("hidden");
+        });
+
+        closeFilter.addEventListener("click", () => {
+          filterModal.classList.add("hidden");
+        });
+
+        // Close on clicking outside
+        document.addEventListener("click", (e) => {
+          if (
+            !filterModal.contains(e.target) &&
+            !filterBtn.contains(e.target)
+          ) {
+            filterModal.classList.add("hidden");
+          }
+        });
+
+        selectAll.addEventListener("click", () => {
+          document
+            .querySelectorAll('input[name="prefix_filter"]')
+            .forEach((cb) => (cb.checked = true));
+        });
+
+        clearAll.addEventListener("click", () => {
+          document
+            .querySelectorAll('input[name="prefix_filter"]')
+            .forEach((cb) => (cb.checked = false));
+        });
+
+        applyFilter.addEventListener("click", () => {
+          const selected = Array.from(
+            document.querySelectorAll('input[name="prefix_filter"]:checked'),
+          ).map((cb) => cb.value);
+          // Save to cookie (1 year expiry)
+          const d = new Date();
+          d.setTime(d.getTime() + 365 * 24 * 60 * 60 * 1000);
+          document.cookie = `dataset_filter=${encodeURIComponent(JSON.stringify(selected))}; expires=${d.toUTCString()}; path=/`;
+          window.location.reload();
+        });
       }
     </script>
   </body>
