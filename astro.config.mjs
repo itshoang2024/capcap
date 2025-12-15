@@ -1,13 +1,17 @@
-// @ts-check
 import { defineConfig } from 'astro/config';
+import tailwindcss from '@tailwindcss/vite';
 import netlify from '@astrojs/netlify';
 
-import tailwindcss from '@tailwindcss/vite';
+const isBuild = process.argv.includes('build');
 
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
-  adapter: netlify(),
+  adapter: isBuild ? netlify() : undefined,
+  prefetch: {
+    prefetchAll: false,
+    defaultStrategy: 'viewport'
+  },
   vite: {
     plugins: [tailwindcss()]
   }
