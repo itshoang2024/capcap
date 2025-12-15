@@ -8,6 +8,10 @@ const isBuild = process.argv.includes('build');
 export default defineConfig({
   output: 'server',
   adapter: isBuild ? netlify() : undefined,
+  prefetch: {
+    prefetchAll: false,
+    defaultStrategy: 'viewport'
+  },
   vite: {
     plugins: [tailwindcss()]
   }

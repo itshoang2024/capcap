@@ -1,6 +1,7 @@
 ---
 import { supabase } from "../db/supabase";
 import "../styles/global.css";
+import { ViewTransitions } from "astro:transitions";
 
 // Enums
 const PAGE_TYPES = [
@@ -369,12 +370,27 @@ if (!finished) {
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <title>Dataset Review</title>
+    <ViewTransitions />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    {/* Preload next/prev images for faster navigation */}
+    {prevId && (
+      <link rel="preload" as="image" href={`${import.meta.env.SUPABASE_URL}/storage/v1/object/public/images/${prevId}.png`} />
+    )}
+    {nextId && (
+      <link rel="preload" as="image" href={`${import.meta.env.SUPABASE_URL}/storage/v1/object/public/images/${nextId}.png`} />
+    )}
+    {/* Prefetch next/prev pages for instant navigation */}
+    {prevId && (
+      <link rel="prefetch" href={`/?search_id=${prevId}&mode=sequential&filter_is_checked=${filterIsChecked}${filterPriority ? `&filter_priority=${filterPriority}` : ''}`} />
+    )}
+    {nextId && (
+      <link rel="prefetch" href={`/?search_id=${nextId}&mode=sequential&filter_is_checked=${filterIsChecked}${filterPriority ? `&filter_priority=${filterPriority}` : ''}`} />
+    )}
     <style>
       ::selection {
         background-color: #cbd5e1;
@@ -451,7 +467,7 @@ if (!finished) {
             {/* Header / Progress / Search */}
             <div class="flex-none p-4 flex flex-col gap-4 bg-zinc-900 border-b border-white/5 shadow-2xl z-10">
               <div class="flex justify-between items-center">
-                 <span class="font-mono text-xs text-zinc-500">ID: {dataRow.id}</span>
+                 <span class="font-mono text-xs text-zinc-300">ID: {dataRow.id}</span>
                  <span class={`text-xs uppercase tracking-wider font-bold px-2 py-1 rounded ${dataRow.review_priority === 'high' ? 'bg-rose-900/50 text-rose-300' : dataRow.review_priority === 'normal' ? 'bg-blue-900/50 text-blue-300' : 'bg-zinc-800 text-zinc-400'}`}>
                     {dataRow.review_priority} Priority
                  </span>
@@ -571,10 +587,10 @@ if (!finished) {
             <div class="flex-none p-4 bg-zinc-900 border-t border-white/5 z-10">
                  <div class="w-full">
                   <div class="flex justify-between items-end mb-1">
-                      <span class="text-xs uppercase tracking-wider font-bold text-zinc-400">Tiến độ</span>
+                      <span class="text-xs uppercase tracking-wider font-bold text-zinc-300">Tiến độ</span>
                       <div class="flex items-center gap-2">
-                          <span class="text-sm font-bold text-white/90">{checkedCount} / {totalCount}</span>
-                          <span class="text-xs text-zinc-500">({totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}%)</span>
+                          <span class="text-sm font-bold text-white">{checkedCount} / {totalCount}</span>
+                          <span class="text-xs text-zinc-300">({totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}%)</span>
                       </div>
                   </div>
                   <div class="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
