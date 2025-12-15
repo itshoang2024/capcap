@@ -218,13 +218,19 @@ if (!finished) {
       
       // Get all IDs sorted
       const { data: allIds } = await baseQuery.order("id", { ascending: true });
-      if (allIds) {
+      if (allIds && allIds.length > 0) {
         sequentialTotal = allIds.length;
         const currentIdx = allIds.findIndex((r) => r.id === searchId);
         if (currentIdx !== -1) {
+          // Current item is in filtered results
           currentIndex = currentIdx + 1; // 1-based
           if (currentIdx > 0) prevId = allIds[currentIdx - 1].id;
           if (currentIdx < allIds.length - 1) nextId = allIds[currentIdx + 1].id;
+        } else {
+          // Current item is NOT in filtered results (e.g., viewing book A but filtering book B)
+          // Allow navigation to first item of filtered results
+          currentIndex = 0; // Show as "0 / total" to indicate current item is outside filter
+          nextId = allIds[0].id; // Navigate to first item in filter
         }
       }
     }
