@@ -151,9 +151,81 @@ if (Astro.request.method === "POST") {
       const filterPriority = currentUrl.searchParams.get("filter_priority");
       
       let redirectUrl = `/?search_id=${id}&saved=true`;
-      if (mode === "sequential") redirectUrl += `&mode=sequential`;
-      if (filterIsChecked && filterIsChecked !== "unchecked") redirectUrl += `&filter_is_checked=${filterIsChecked}`;
-      if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
+      
+      // In sequential mode with unchecked filter, find and redirect to next item
+      // since current item is no longer in the unchecked list
+      if (mode === "sequential" && filterIsChecked === "unchecked") {
+        // Get active filters from cookie
+        const cookieHeader = Astro.request.headers.get("cookie") || "";
+        const getCookieValue = (name: string) => {
+          const value = `; ${cookieHeader}`;
+          const parts = value.split(`; ${name}=`);
+          if (parts.length === 2) return parts.pop()?.split(";").shift();
+          return null;
+        };
+        const filterCookie = getCookieValue("dataset_filter");
+        let currentActiveFilters = PREFIXES;
+        if (filterCookie) {
+          try {
+            const parsed = JSON.parse(decodeURIComponent(filterCookie));
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              currentActiveFilters = parsed;
+            }
+          } catch (e) {}
+        }
+        
+        const filterQuery = currentActiveFilters.map((p: string) => `id.like.${p}%`).join(",");
+        
+        // Find the next unchecked item after current ID
+        let nextQuery = supabase
+          .from("dataset")
+          .select("id")
+          .eq("is_checked", "unchecked")
+          .gt("id", id as string);
+        
+        if (filterPriority) {
+          nextQuery = nextQuery.eq("review_priority", filterPriority);
+        }
+        if (filterQuery) {
+          nextQuery = nextQuery.or(filterQuery);
+        }
+        
+        const { data: nextItems } = await nextQuery.order("id", { ascending: true }).limit(1);
+        
+        if (nextItems && nextItems.length > 0) {
+          // Redirect to next unchecked item
+          redirectUrl = `/?search_id=${nextItems[0].id}&saved=true&mode=sequential`;
+          if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
+        } else {
+          // No more items after current, try to get the first unchecked item
+          let firstQuery = supabase
+            .from("dataset")
+            .select("id")
+            .eq("is_checked", "unchecked");
+          
+          if (filterPriority) {
+            firstQuery = firstQuery.eq("review_priority", filterPriority);
+          }
+          if (filterQuery) {
+            firstQuery = firstQuery.or(filterQuery);
+          }
+          
+          const { data: firstItems } = await firstQuery.order("id", { ascending: true }).limit(1);
+          
+          if (firstItems && firstItems.length > 0) {
+            redirectUrl = `/?search_id=${firstItems[0].id}&saved=true&mode=sequential`;
+            if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
+          } else {
+            // No more unchecked items at all
+            redirectUrl = `/?saved=true&mode=sequential`;
+            if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
+          }
+        }
+      } else {
+        if (mode === "sequential") redirectUrl += `&mode=sequential`;
+        if (filterIsChecked && filterIsChecked !== "unchecked") redirectUrl += `&filter_is_checked=${filterIsChecked}`;
+        if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
+      }
       
       return Astro.redirect(redirectUrl);
     }
