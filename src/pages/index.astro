@@ -463,12 +463,20 @@ if (!finished) {
             <p class="text-slate-500">
               Bạn đã kiểm tra xong toàn bộ dữ liệu.
             </p>
-            <button
-              onclick="window.location.reload()"
-              class="px-6 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              Kiểm tra lại
-            </button>
+            <div class="flex flex-col gap-3">
+              <button
+                onclick="window.location.href='/?filter_is_checked=all'"
+                class="px-6 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                Xem lại dữ liệu đã kiểm tra
+              </button>
+              <button
+                onclick="document.cookie='dataset_filter=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'; window.location.href='/'"
+                class="px-6 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Kiểm tra sách khác
+              </button>
+            </div>
           </div>
         </div>
       ) : dataRow ? (
