@@ -1470,7 +1470,13 @@ if (!finished) {
               const isChecked = document.getElementById("filter-is-checked").value;
               const viewModeSelect = document.getElementById("view-mode");
               const mode = viewModeSelect ? viewModeSelect.value : "random";
+              const currentUrl = new URL(window.location.href);
               const url = new URL(window.location.href);
+              
+              // Get current filter values to detect changes
+              const currentPriority = currentUrl.searchParams.get("filter_priority") || "";
+              const currentIsChecked = currentUrl.searchParams.get("filter_is_checked") || "unchecked";
+              const currentMode = currentUrl.searchParams.get("mode") || "random";
               
               // Update params
               if(priority) url.searchParams.set("filter_priority", priority);
@@ -1486,9 +1492,13 @@ if (!finished) {
                   url.searchParams.delete("mode");
               }
               
-              // If switching to sequential mode, clear search_id to start from beginning
-              // If switching to random mode, clear search_id to get a new random item
-              if(url.searchParams.get("mode") !== new URL(window.location.href).searchParams.get("mode")) {
+              // Clear search_id if any filter changed to get a fresh result matching new filters
+              const filtersChanged = 
+                  priority !== currentPriority || 
+                  isChecked !== currentIsChecked || 
+                  mode !== currentMode;
+              
+              if(filtersChanged) {
                   url.searchParams.delete("search_id");
               }
               
