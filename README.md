@@ -1,43 +1,163 @@
-# Astro Starter Kit: Minimal
+# CapCap - Caption Review & Editing Tool
 
-```sh
-bun create astro@latest -- --template minimal
+A specialized web application for reviewing and editing image captions in educational datasets. Built with Astro and Supabase, this tool provides an intuitive interface for annotating textbook images with quality captions.
+
+## 🎯 Features
+
+- **Two Viewing Modes**
+  - **Random Mode**: Weighted random selection prioritizing high-priority items (50% high, 33% normal, 17% low)
+  - **Sequential Mode**: Navigate through items in sorted order with keyboard shortcuts (←/→)
+
+- **Dual Caption Editor**
+  - **Caption Short**: Concise image description
+  - **Caption Detail**: Comprehensive, detailed caption
+  - Read-only mode with easy edit toggle
+  - Auto-expanding textareas with change tracking
+
+- **Smart Filtering**
+  - Filter by book/dataset scope (10 Vietnamese textbooks)
+  - Filter by review priority (high/normal/low)
+  - Filter by status (unchecked/checked/reviewed)
+  - Search by ID for quick access
+
+- **Comprehensive Annotation Interface**
+  - Page type classification (cover, content, exercise, etc.)
+  - Text and table detection
+  - Objects present tagging (40+ categories)
+  - Error tags (OCR issues, hallucinations, counting errors, etc.)
+  - Auto-flags verification
+  - Notes and change log tracking
+
+- **Progress Tracking**
+  - Real-time progress bar showing completion percentage
+  - Checkpoint system for filtered datasets
+  - Visual feedback with status badges
+
+- **Responsive Split-View Layout**
+  - Resizable panels (horizontal and vertical)
+  - Image viewer with optimal scaling
+  - Fixed caption editor for easy access
+  - Scrollable annotation form
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Bun](https://bun.com/) (recommended) or Node.js 18+
+- Supabase account with configured database
+
+### Installation
+
+```bash
+# Clone the repository
+git clone git@github.com:itshoang2024/capcap.git
+cd capcap
+
+# Install dependencies
+bun install
+
+# Set up environment variables
+cp .env.example .env.local
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+### Environment Variables
 
-## 🚀 Project Structure
+Create a `.env.local` file with your Supabase credentials:
 
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_key
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+### Database Schema
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+The application expects a `dataset` table in Supabase with the following structure:
 
-Any static assets, like images, can be placed in the `public/` directory.
+- `id` (text, primary key) - Image identifier
+- `page_type` (enum) - Page classification
+- `has_text` (boolean) - Text presence indicator
+- `has_table` (boolean) - Table presence indicator
+- `objects_present` (text[]) - Array of detected objects
+- `error_tags` (text[]) - Quality issues
+- `auto_flags` (text[]) - Automated quality flags
+- `caption_short` (text) - Short caption
+- `caption_detail` (text) - Detailed caption
+- `text_in_image` (text) - OCR text verification
+- `notes` (text) - Reviewer notes
+- `change_log` (text) - Edit history
+- `review_priority` (enum: low/normal/high)
+- `is_checked` (enum: unchecked/checked/reviewed)
 
-## 🧞 Commands
+Images should be stored in Supabase Storage at `images/<id>.png`.
 
-All commands are run from the root of the project, from a terminal:
+### Development
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
+```bash
+# Start development server
+bun dev
+# App will be available at http://localhost:4321
+```
 
-## 👀 Want to learn more?
+### Build & Deploy
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+```bash
+# Build for production
+bun build
+
+# Preview production build
+bun preview
+```
+
+The app is configured for Netlify deployment via `netlify.toml`.
+
+## 📚 Supported Datasets
+
+Currently configured for 10 Vietnamese elementary textbooks (Sách Giáo Khoa Cánh Diều):
+
+- Đạo Đức (Grades 1-3)
+- Tiếng Việt (Grade 2, Volumes 1-2)
+- Toán (Grades 1, 3)
+- Tự Nhiên Và Xã Hội (Grades 1-3)
+
+## 🎨 Technology Stack
+
+- **Frontend**: [Astro](https://astro.build/) - Modern web framework
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS
+- **Database**: [Supabase](https://supabase.com/) - PostgreSQL + Storage
+- **Deployment**: [Netlify](https://netlify.com/)
+- **Runtime**: [Bun](https://bun.sh/) (recommended)
+
+## 🎮 Keyboard Shortcuts
+
+- **← (Left Arrow)**: Previous item (Sequential mode)
+- **→ (Right Arrow)**: Next item (Sequential mode)
+- **Enter** in search: Jump to ID
+- **C**: Confirm "Yes" in questions
+- **K**: Select "No" in questions
+- **S**: Skip question
+
+## 🔄 Workflow
+
+1. **Select Filters**: Choose book scope, priority, and status
+2. **Review Image**: Examine the textbook page
+3. **Edit Captions**: Click "Edit" to modify short/detail captions
+4. **Annotate**: Answer questions and add tags
+5. **Save**: Submit to mark as checked and move to next item
+
+In Sequential mode with unchecked filter, saving automatically advances to the next unchecked item.
+
+## 📝 Development Notes
+
+- Server-side rendering with Astro for fast initial loads
+- View Transitions API for smooth navigation
+- Optimistic image preloading for next/previous items
+- Client-side state persistence via cookies
+- Auto-expanding textareas for better UX
+
+## 📄 License
+
+[Add your license here]
+
+## 🤝 Contributing
+
+[Add contribution guidelines if applicable]
