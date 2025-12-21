@@ -193,8 +193,8 @@ if (Astro.request.method === "POST") {
         const { data: nextItems } = await nextQuery.order("id", { ascending: true }).limit(1);
         
         if (nextItems && nextItems.length > 0) {
-          // Redirect to next unchecked item
-          redirectUrl = `/?search_id=${nextItems[0].id}&saved=true&mode=sequential`;
+          // Redirect to next unchecked item (no saved=true since it's a new page)
+          redirectUrl = `/?search_id=${nextItems[0].id}&mode=sequential&filter_is_checked=unchecked`;
           if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
         } else {
           // No more items after current, try to get the first unchecked item
@@ -213,11 +213,12 @@ if (Astro.request.method === "POST") {
           const { data: firstItems } = await firstQuery.order("id", { ascending: true }).limit(1);
           
           if (firstItems && firstItems.length > 0) {
-            redirectUrl = `/?search_id=${firstItems[0].id}&saved=true&mode=sequential`;
+            // Redirect to first unchecked item (no saved=true since it's a new page)
+            redirectUrl = `/?search_id=${firstItems[0].id}&mode=sequential&filter_is_checked=unchecked`;
             if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
           } else {
             // No more unchecked items at all
-            redirectUrl = `/?saved=true&mode=sequential`;
+            redirectUrl = `/?mode=sequential&filter_is_checked=unchecked`;
             if (filterPriority) redirectUrl += `&filter_priority=${filterPriority}`;
           }
         }
